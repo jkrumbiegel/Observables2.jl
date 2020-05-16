@@ -4,11 +4,8 @@ using Test
 @testset "Basics" begin
     xx = Observable([1, 2, 3])
 
-    yy = observe(xx, "hello") do xs, str
-        if length(xs) > 10
-            error(str)
-        end
-        xs .* 2
+    yy = observe(xx, 2) do xs, factor
+        xs .* factor
     end
 
     zz = observe(yy) do y
@@ -29,25 +26,27 @@ end
     yy = observe(identity, xx)
 
     @test string(xx) == """
-        Observable{Array{Int64,1}} with 0 observable and 0 ordinary inputs, and 1 observers.
+        Observable{Array{Int64,1}} with 0 observable, 0 ordinary inputs, and 1 observers.
         Value: [1, 2, 3]"""
 
     @test string(yy) == """
-        Observable{Array{Int64,1}} with 1 observable and 0 ordinary inputs, and 0 observers.
+        Observable{Array{Int64,1}} with 1 observable, 0 ordinary inputs, and 0 observers.
         Value: [1, 2, 3]"""
 
     stop_observing!(yy)
 
     @test string(xx) == """
-        Observable{Array{Int64,1}} with 0 observable and 0 ordinary inputs, and 0 observers.
+        Observable{Array{Int64,1}} with 0 observable, 0 ordinary inputs, and 0 observers.
         Value: [1, 2, 3]"""
 
     @test string(yy) == """
-        Observable{Array{Int64,1}} with 0 observable and 1 ordinary inputs, and 0 observers.
+        Observable{Array{Int64,1}} with 0 observable, 1 ordinary inputs, and 0 observers.
         Value: [1, 2, 3]"""
 end
 
 @testset "Typing" begin
+    xx = Observable([1, 2, 3])
+    @test typeof(xx) == Observable{Array{Int,1}, Nothing}
     xx = Observable([1, 2, 3], type = Any)
     @test typeof(xx) == Observable{Any, Nothing}
 end

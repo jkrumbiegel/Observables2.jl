@@ -129,9 +129,12 @@ n_ordinary_inputs(o::Observable) = sum((!isa).(o.inputs, RegisteredObservable))
 n_observable_inputs(o::Observable) = sum(isa.(o.inputs, RegisteredObservable))
 
 function Base.show(io::IO, o::Observable{V}) where V
-    nl = length(o.observers)
 
-    str = "Observable{$V} with $(n_observable_inputs(o)) observable and $(n_ordinary_inputs(o)) ordinary inputs, and $nl observers."
+    n_observable = n_observable_inputs(o)
+    n_ordinary = n_ordinary_inputs(o)
+    n_observers = length(o.observers)
+
+    str = "Observable{$V} with $n_observable observable, $n_ordinary ordinary inputs, and $n_observers observers."
     println(io, str)
     print(io, "Value: $(o.value)")
     nothing
