@@ -1,0 +1,13 @@
+name = "Observables2"
+uuid = "d60e01a7-a8ec-4462-a6fd-21879f43bc69"
+authors = ["Julius Krumbiegel"]
+version = "0.1.0"
+
+[compat]
+julia = "1"
+
+[extras]
+Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
+
+[targets]
+test = ["Test"]
