@@ -1,6 +1,6 @@
 # Observables2
 
-[![Build Status](https://api.travis-ci.com/jkrumbiegel/Observables2.svg?branch=master)](https://travis-ci.com/jkrumbiegel/Observables2)
+[![Build Status](https://api.travis-ci.com/jkrumbiegel/Observables2.jl.svg?branch=master)](https://travis-ci.com/jkrumbiegel/Observables2.jl)
 [![Codecov](https://codecov.io/gh/jkrumbiegel/Observables2.jl/branch/master/graph/badge.svg)](https://codecov.io/gh/jkrumbiegel/Observables2.jl)
 
 
