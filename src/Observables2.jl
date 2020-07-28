@@ -6,7 +6,7 @@ export stop_observing!
 export disable!
 
 mutable struct Observable{V, F<:Union{Function, Nothing}}
-    value::V
+    val::V
     f::F
     inputs::Vector{Any}
     observers::Vector{Observable}
@@ -27,11 +27,11 @@ end
 Observable(v; onlynew = false, type = nothing) =
     Observable{isnothing(type) ? typeof(v) : type}(v, nothing, [], Observable[], onlynew)
 
-get_registered_value(r::RegisteredObservable) = r.o.value
+get_registered_value(r::RegisteredObservable) = r.o.val
 get_registered_value(any) = any
 
 function Base.setindex!(obs::Observable, value, ::typeof(!))
-    obs.value = value
+    obs.val = value
     for o in obs.observers
         new_value = o.f((get_registered_value(input) for input in o.inputs)...)
         set_new_value!(o, new_value)
@@ -40,7 +40,7 @@ function Base.setindex!(obs::Observable, value, ::typeof(!))
 end
 
 function set_new_value!(o::Observable, value)
-    if !o.onlynew || o.value != value
+    if !o.onlynew || o.val != value
         o[!] = value
     end
 end
@@ -49,7 +49,7 @@ function Base.setindex!(obs::Observable, value)
     set_new_value!(obs, value)
 end
 
-Base.getindex(obs::Observable) = obs.value
+Base.getindex(obs::Observable) = obs.val
 
 function register!(with::Observable, o::Observable)
     if o in with.observers
@@ -59,7 +59,7 @@ function register!(with::Observable, o::Observable)
 end
 
 get_value(any) = any
-get_value(o::Observable) = o.value
+get_value(o::Observable) = o.val
 
 wrap_register(any) = any
 wrap_register(o::Observable) = RegisteredObservable(o)
@@ -136,7 +136,7 @@ function Base.show(io::IO, o::Observable{V}) where V
 
     str = "Observable{$V} with $n_observable observable, $n_ordinary ordinary inputs, and $n_observers observers."
     println(io, str)
-    print(io, "Value: $(o.value)")
+    print(io, "Value: $(o.val)")
     nothing
 end
 
