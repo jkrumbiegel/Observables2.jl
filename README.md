@@ -16,9 +16,39 @@ To remove that closure and disable the observable, two things are needed in `Obs
 
 In `Observables2.jl`, an observable doesn't only store a vector of listeners, it also stores a vector of inputs. The inputs can be of any type, the listeners can only be observables.
 
+```julia
+julia> xx = Observable([1, 2, 3])
+
+# Observable{Array{Int64,1}} with 0 observable, 0 ordinary inputs, and 0 observers.
+# Value: [1, 2, 3]
+
+julia> yy = observe(xx, 2) do xs, factor
+               xs .* factor
+           end
+# Observable{Array{Int64,1}} with 1 observable, 1 ordinary inputs, and 0 observers.
+# Value: [2, 4, 6]
+
+julia> xx
+
+# Observable{Array{Int64,1}} with 0 observable, 0 ordinary inputs, and 1 observers.
+# Value: [2, 3, 4]
+```
+
 You can deactivate an observable (make it stop listening) by calling `stop_observing!`.
 
 There are two variants: specifically stopping to observe one observable, or stopping to observe all inputs (if there are multiple). Either `stop_observing!(observable, input)` or `stop_observing!(observable)`. For each disabled input, the input entry in the observable is replaced with the last value of that input. This means the closure of the observable will still work, disabled inputs will just never change again.
+
+```julia
+julia> stop_observing!(yy)
+
+julia> yy
+# Observable{Array{Int64,1}} with 0 observable, 2 ordinary inputs, and 0 observers.
+# Value: [4, 6, 8]
+
+julia> xx
+# Observable{Array{Int64,1}} with 0 observable, 0 ordinary inputs, and 0 observers.
+# Value: [2, 3, 4]
+```
 
 ## Recursive disabling
 
@@ -41,5 +71,4 @@ o = Observable(1, onlynew = true)
 
 o[] = 1 # nothing happens with the listeners
 o[!] = 1 # the listeners get triggered even though the value is the same
-
 ```
