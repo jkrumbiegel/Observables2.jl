@@ -76,3 +76,28 @@ end
     @test testref[] == 8
 
 end
+
+
+@testset "no value extras" begin
+    x = Observable(1)
+
+    r = Ref(0)
+
+    # create a NoValue observable
+    y = on(x) do x
+        r[] += 1
+    end
+
+    notify!(x)
+    @test r[] == 1
+
+    # this should error as you can't observe a NoValue observable
+    @test_throws ErrorException z = observe!(y) do y
+        y * 2
+    end
+
+    stop_observing!(y)
+    notify!(x)
+    # r should not have incremented further
+    @test r[] == 1
+end
