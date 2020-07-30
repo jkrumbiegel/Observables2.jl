@@ -20,6 +20,11 @@ export n_observable_inputs
 
 abstract type AbstractObservable{T} end
 
+# this struct is used to parameterize Observables without a value
+# before, you would use `on` and just retrieve a closure that would be
+# stored in the listeners array
+# but a closure doesn't keep a reference to its inputs, which is why it's
+# harder to disconnect
 struct NoValue end
 
 
