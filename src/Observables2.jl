@@ -102,20 +102,17 @@ function Base.setindex!(obs::Observable, value, ::typeof(!))
             # call the stored function with the values of registered observables
             # or the inputs directly and save the value, set it as the new observable value
             new_value = o.f((get_registered_value(input) for input in o.inputs)...)
-            set_new_value!(o, new_value)
+            o[] = new_value
         end
     end
     obs
 end
 
-function set_new_value!(o::Observable, value)
-    if !o.onlynew || o.val != value
-        o[!] = value
-    end
-end
 
 function Base.setindex!(obs::Observable, value)
-    set_new_value!(obs, value)
+    if !obs.onlynew || obs.val != value
+        obs[!] = value
+    end
 end
 
 Base.getindex(obs::Observable) = obs.val
