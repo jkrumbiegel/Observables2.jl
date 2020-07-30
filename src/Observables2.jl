@@ -16,6 +16,7 @@ export NoValue
 export n_ordinary_inputs
 export n_observable_inputs
 
+
 abstract type AbstractObservable{T} end
 
 struct NoValue end
@@ -60,13 +61,13 @@ to_value(x) = x
 listeners(o::Observable) = o.listeners
 
 
-function Base.copy(o::Observable{T}) where T
-    oc = Observable{T}(o.val)
-    on(o) do o
-        oc[] = o
-    end
-    oc
-end
+# function Base.copy(o::Observable{T}) where T
+#     oc = Observable{T}(o.val)
+#     on(o) do o
+#         oc[] = o
+#     end
+#     oc
+# end
 
 function connect!(o1::Observable, o2::Observable)
     error("not implemented")
