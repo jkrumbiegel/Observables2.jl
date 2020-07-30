@@ -48,36 +48,8 @@ Observable{T}(v) where T = Observable(v; type = T)
 #     observe!(f, o, os...)
 # end
 
-Base.eltype(::AbstractObservable{T}) where {T} = T
 
 
-
-
-
-# triggering an observable again with its current value
-function notify!(o::Observable)
-    o[!] = o[]
-end
-
-
-# extracting a value from an observable
-to_value(o::Observable) = o.val
-to_value(x) = x
-
-listeners(o::Observable) = o.listeners
-
-
-# function Base.copy(o::Observable{T}) where T
-#     oc = Observable{T}(o.val)
-#     on(o) do o
-#         oc[] = o
-#     end
-#     oc
-# end
-
-function connect!(o1::Observable, o2::Observable)
-    error("not implemented")
-end
 
 # if we allow replacement of active observables with their values to inactivate them
 # there needs to be a wrapper type to distinguish between an observable that is registered
@@ -182,8 +154,13 @@ function observe!(f, inputs...; onlynew = false, type::Union{Type, Nothing, NoVa
     obs
 end
 
+
+
+
+
 # these functions mimick the current observables api
-# the difference is that they return an observable{NoValue} and not a function
+
+# the difference for on / onany / off is that they return an observable{NoValue} and not a function
 # that is because a function doesn't know about observables that keep track of it
 # so it becomes more difficult to unlink
 
@@ -191,7 +168,7 @@ function on(f, input)
     observe!(f, input, type = NoValue())
 end
 
-# here the order is different, the listener is removed from the input
+# here the argument order is different, the listener is removed from the input
 # because only that direction is possible in Observables.jl
 function off(input, listener)
     stop_observing!(listener, input)
@@ -200,6 +177,36 @@ end
 function onany(f, inputs...)
     observe!(f, inputs...; type = NoValue())
 end
+
+Base.eltype(::AbstractObservable{T}) where {T} = T
+
+
+# triggering an observable again with its current value
+function notify!(o::Observable)
+    o[!] = o[]
+end
+
+
+# extracting a value from an observable
+to_value(o::Observable) = o.val
+to_value(x) = x
+
+listeners(o::Observable) = o.listeners
+
+
+# function Base.copy(o::Observable{T}) where T
+#     oc = Observable{T}(o.val)
+#     on(o) do o
+#         oc[] = o
+#     end
+#     oc
+# end
+
+function connect!(o1::Observable, o2::Observable)
+    error("not implemented")
+end
+
+
 
 
 
