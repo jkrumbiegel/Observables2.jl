@@ -69,6 +69,8 @@ end
 
     @test objectcounter[] == 1
     GC.gc()
+    # the object shouldn't be garbage collected because it is referenced
+    # in a closure in zz
     @test objectcounter[] == 1
 
     @test !is_disabled(qq)
