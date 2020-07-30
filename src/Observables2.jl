@@ -89,8 +89,12 @@ function Base.setindex!(obs::Observable, value, ::typeof(!))
     for o in obs.listeners
         # NoValue observables don't get a new value set, just their function called
         if o isa Observable{NoValue}
+            # call the stored function with the values of registered observables
+            # or the inputs directly
             o.f((get_registered_value(input) for input in o.inputs)...)
         else
+            # call the stored function with the values of registered observables
+            # or the inputs directly and save the value, set it as the new observable value
             new_value = o.f((get_registered_value(input) for input in o.inputs)...)
             set_new_value!(o, new_value)
         end
