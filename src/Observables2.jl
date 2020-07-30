@@ -244,13 +244,21 @@ end
 """
     disable!(o::Observable; recursive = true)
 
-Make all listeners of `o` stop observing it.
+Make an observable `o` stop observing all its inputs.
+Set the stored function to `nothing`, so objects referenced in the
+closure can possibly be released.
+
+Then also make all listeners of `o` stop observing it.
 If `recursive` is `true`, all listeners that don't have any `Observable` inputs
 left after stopping are also disabled.
 
 Returns the number of all disabled `Observable`s.
 """
 function disable!(o::Observable; recursive = true)
+
+    stop_observing!(o)
+    o.f = nothing
+        
     n_disabled = 1
     for observer in o.listeners
         stop_observing!(observer, o)
