@@ -18,6 +18,9 @@ export n_ordinary_inputs
 export n_observable_inputs
 
 
+
+
+
 abstract type AbstractObservable{T} end
 
 # this struct is used to parameterize Observables without a value
@@ -35,6 +38,8 @@ mutable struct Observable{V} <: AbstractObservable{V}
     listeners::Vector{<:AbstractObservable}
     onlynew::Bool
 end
+
+
 
 
 # creating an observable from a value only
@@ -62,6 +67,10 @@ end
 get_registered_value(r::RegisteredObservable) = r.o.val
 get_registered_value(any) = any
 
+
+
+
+
 # obs[!] = new_value always triggers a change message
 function Base.setindex!(obs::Observable, value, ::typeof(!))
     obs.val = value
@@ -81,6 +90,7 @@ function Base.setindex!(obs::Observable, value, ::typeof(!))
     obs
 end
 
+
 # obs[] = new_value only triggers a change message if onlynew is true
 function Base.setindex!(obs::Observable, value)
     if !(obs.onlynew && obs.val == value)
@@ -89,6 +99,10 @@ function Base.setindex!(obs::Observable, value)
 end
 
 Base.getindex(obs::Observable) = obs.val
+
+
+
+
 
 function register!(with::Observable, o::Observable)
     if o in with.listeners
@@ -103,6 +117,8 @@ wrap_register(o::Observable) = RegisteredObservable(o)
 
 unwrap_register(any) = any
 unwrap_register(ro::RegisteredObservable) = ro.o
+
+
 
 
 
@@ -299,6 +315,8 @@ end
 
 n_ordinary_inputs(o::Observable) = sum((!isa).(o.inputs, RegisteredObservable))
 n_observable_inputs(o::Observable) = sum(isa.(o.inputs, RegisteredObservable))
+
+
 
 
 
