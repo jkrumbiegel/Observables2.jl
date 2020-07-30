@@ -27,7 +27,7 @@ mutable struct Observable{V} <: AbstractObservable{V}
     val::V
     f::Any
     inputs::Vector{Any}
-    listeners::Vector{<:Observable}
+    listeners::Vector{<:AbstractObservable}
     onlynew::Bool
 end
 
