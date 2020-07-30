@@ -18,7 +18,75 @@ using Test
     @test zz[] == [0.4, 0.6, 0.8]
 
     # check that all three observables are disabled through xx
+    @test !is_disabled(xx)
+    @test !is_disabled(yy)
+    @test !is_disabled(zz)
+
     @test disable!(xx) == 3
+
+    @test is_disabled(xx)
+    @test is_disabled(yy)
+    @test is_disabled(zz)
+end
+
+@testset "disabling middleman" begin
+
+    objectcounter = Ref(0)
+
+    mutable struct ObjectInMemory
+        function ObjectInMemory()
+            objectcounter[] += 1
+            o = new()
+            finalizer(o) do o
+                objectcounter[] -= 1
+                o
+            end
+            o
+        end
+    end
+
+    qq = Observable([1, 2, 3])
+
+    xx = observe!(identity, qq)
+
+    yy = observe!(xx, 2) do xs, factor
+        xs .* factor
+    end
+
+    @test objectcounter[] == 0
+
+    zz = let
+        memoryobject = ObjectInMemory()
+
+        observe!(yy) do y
+            # close over memoryobject
+            if length(y) > 5
+                println(memoryobject)
+            end
+            y ./ 10
+        end
+    end
+
+    @test objectcounter[] == 1
+    GC.gc()
+    @test objectcounter[] == 1
+
+    @test !is_disabled(qq)
+    @test !is_disabled(xx)
+    @test !is_disabled(yy)
+    @test !is_disabled(zz)
+
+    @test disable!(yy) == 2
+
+    # yy and zz should be disabled, qq and xx shouldn't
+    @test !is_disabled(qq)
+    @test !is_disabled(xx)
+    @test is_disabled(yy)
+    @test is_disabled(zz)
+
+    GC.gc()
+    @test isnothing(zz.f)
+    @test objectcounter[] == 0
 end
 
 @testset "Printing" begin

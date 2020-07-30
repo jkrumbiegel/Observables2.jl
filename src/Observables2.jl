@@ -5,6 +5,7 @@ export Observable
 export observe!
 export stop_observing!
 export disable!
+export is_disabled
 export listeners
 export notify!
 export to_value
@@ -269,6 +270,16 @@ function disable!(o::Observable; recursive = true)
         end
     end
     n_disabled
+end
+
+"""
+    is_disabled(o::Observable)
+
+Checks that `o` has no observable inputs and no listeners.
+Also, it should have no stored function.
+"""
+function is_disabled(o::Observable)
+    n_observable_inputs(o) == 0 && isempty(listeners(o)) && isnothing(o.f)
 end
 
 
