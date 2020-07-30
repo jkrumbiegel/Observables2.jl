@@ -132,7 +132,7 @@ end
         testref[] = x + y
     end
 
-    @test z isa Observable{NoValue}
+    @test z isa ObservingFunction
     @test testref[] == 0
     x[] = 3
     @test testref[] == 5
@@ -149,23 +149,18 @@ end
 end
 
 
-@testset "no value extras" begin
+@testset "ObservingFunction extras" begin
     x = Observable(1)
 
     r = Ref(0)
 
-    # create a NoValue observable
+    # create an ObservingFunction
     y = on(x) do x
         r[] += 1
     end
 
     notify!(x)
     @test r[] == 1
-
-    # this should error as you can't observe a NoValue observable
-    @test_throws ErrorException z = observe!(y) do y
-        y * 2
-    end
 
     stop_observing!(y)
     notify!(x)

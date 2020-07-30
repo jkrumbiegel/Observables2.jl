@@ -2,6 +2,7 @@ module Observables2
 
 
 export Observable
+export ObservingFunction
 export observe!
 export stop_observing!
 export disable!
@@ -13,7 +14,6 @@ export on
 export off
 export onany
 export connect! # obsid, async_latest, throttle
-export NoValue
 export n_ordinary_inputs
 export n_observable_inputs
 
@@ -23,20 +23,19 @@ export n_observable_inputs
 
 abstract type AbstractObservable{T} end
 
-# this struct is used to parameterize Observables without a value
-# before, you would use `on` and just retrieve a closure that would be
-# stored in the listeners array
-# but a closure doesn't keep a reference to its inputs, which is why it's
-# harder to disconnect
-struct NoValue end
 
 
 mutable struct Observable{V} <: AbstractObservable{V}
     val::V
     f::Any
     inputs::Vector{Any}
-    listeners::Vector{<:AbstractObservable}
+    listeners::Vector{Any}
     onlynew::Bool
+end
+
+struct ObservingFunction{F}
+    f::F
+    inputs::Vector{Any}
 end
 
 
@@ -75,8 +74,8 @@ get_registered_value(any) = any
 function Base.setindex!(obs::Observable, value, ::typeof(!))
     obs.val = value
     for o in obs.listeners
-        # NoValue observables don't get a new value set, just their function called
-        if o isa Observable{NoValue}
+        # ObservingFunctions don't get a new value set, just their function called
+        if o isa ObservingFunction
             # call the stored function with the values of registered observables
             # or the inputs directly
             o.f((get_registered_value(input) for input in o.inputs)...)
@@ -104,7 +103,7 @@ Base.getindex(obs::Observable) = obs.val
 
 
 
-function register!(with::Observable, o::Observable)
+function register!(with::Observable, o::Union{Observable, ObservingFunction})
     if o in with.listeners
         error("Observable already registered as observer.")
     end
@@ -124,30 +123,16 @@ unwrap_register(ro::RegisteredObservable) = ro.o
 
 # creating an observable from inputs and a function acting on those inputs
 
-function observe!(f, inputs...; onlynew = false, type::Union{Type, Nothing, NoValue} = nothing)
+function observe!(f, inputs...; onlynew = false, type::Union{Type, Nothing} = nothing)
 
-    for i in eachindex(inputs)
-        if inputs[i] isa Observable{NoValue}
-            error("Input $i is an Observable{NoValue}. You can't observe such an observable as it has no value.")
-        end
-    end
-
-
-    # compute first value if observable doesn't have the NoValue type
-    # the NoValue type is for on/onany which don't store values, just execute functions
-    value = if type isa NoValue
-        NoValue()
-    else
-        f((to_value(input) for input in inputs)...)
-    end
+    # compute first value
+    value = f((to_value(input) for input in inputs)...)
 
 
     # make a new observer that tracks who he observes but isn't yet registered with the other listeners
     param = if isnothing(type)
         # the parameter type is decided by the value
         typeof(value)
-    elseif type isa NoValue
-        NoValue
     else
         # the parameter type is manually given
         type
@@ -157,7 +142,7 @@ function observe!(f, inputs...; onlynew = false, type::Union{Type, Nothing, NoVa
         value,
         f,
         Any[wrap_register(i) for i in inputs],
-        Observable[],
+        [],
         onlynew)
 
     # register the new observable with the inputs
@@ -173,15 +158,14 @@ end
 
 
 
-
 # these functions mimick the current observables api
 
-# the difference for on / onany / off is that they return an observable{NoValue} and not a function
+# the difference for on / onany / off is that they return an ObservingFunction and not a function
 # that is because a function doesn't know about observables that keep track of it
 # so it becomes more difficult to unlink
 
 function on(f, input)
-    observe!(f, input, type = NoValue())
+    onany(f, input)
 end
 
 # here the argument order is different, the listener is removed from the input
@@ -191,7 +175,15 @@ function off(input, listener)
 end
 
 function onany(f, inputs...)
-    observe!(f, inputs...; type = NoValue())
+    ofunc = ObservingFunction(f, Any[wrap_register(i) for i in inputs])
+
+    for o in inputs
+        if o isa Observable
+            register!(o, ofunc)
+        end
+    end
+
+    ofunc
 end
 
 Base.eltype(::AbstractObservable{T}) where {T} = T
@@ -234,7 +226,7 @@ end
 Replace the `input` `Observable` in the input vector of the `observer` with its value
 and remove the `observer` from the `listeners` of the `input` `Observable`.
 """
-function stop_observing!(observer::Observable, input::Observable)
+function stop_observing!(observer, input::Observable)
     # delete input in observer
     inputindex = findfirst(==(RegisteredObservable(input)), observer.inputs)
 
@@ -253,7 +245,7 @@ end
 
 
 # if the input is not an observable
-function stop_observing!(observer::Observable, input)
+function stop_observing!(observer, input)
     # do nothing
 end
 
@@ -264,7 +256,7 @@ end
 Replace all `Observable`s in the input vector of the `observer` with their values
 and remove the `observer` from the `listeners` of each of these `Observable`s.
 """
-function stop_observing!(observer::Observable)
+function stop_observing!(observer)
     for input in observer.inputs
         stop_observing!(observer, unwrap_register(input))
     end
@@ -313,8 +305,8 @@ end
 
 
 
-n_ordinary_inputs(o::Observable) = sum((!isa).(o.inputs, RegisteredObservable))
-n_observable_inputs(o::Observable) = sum(isa.(o.inputs, RegisteredObservable))
+n_ordinary_inputs(o) = sum((!isa).(o.inputs, RegisteredObservable))
+n_observable_inputs(o) = sum(isa.(o.inputs, RegisteredObservable))
 
 
 
