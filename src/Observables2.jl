@@ -134,6 +134,13 @@ unwrap_register(ro::RegisteredObservable) = ro.o
 
 function observe!(f, inputs...; onlynew = false, type::Union{Type, Nothing, NoValue} = nothing)
 
+    for i in eachindex(inputs)
+        if inputs[i] isa Observable{NoValue}
+            error("Input $i is an Observable{NoValue}. You can't observe such an observable as it has no value.")
+        end
+    end
+
+
     # compute first value if observable doesn't have the NoValue type
     # the NoValue type is for on/onany which don't store values, just execute functions
     value = if type isa NoValue
