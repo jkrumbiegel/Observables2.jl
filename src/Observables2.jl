@@ -149,23 +149,29 @@ function observe!(f, inputs...; onlynew = false, type::Union{Type, Nothing, NoVa
         f((to_value(input) for input in inputs)...)
     end
 
+
     # make a new observer that tracks who he observes but isn't yet registered with the other listeners
     if isnothing(type)
+        # the parameter type is decided by the value
         obs = Observable(value, f,
             Any[wrap_register(i) for i in inputs], Observable[], onlynew)
     elseif type isa NoValue
+        # the parameter type is NoValue
         obs = Observable{NoValue}(NoValue(), f,
             Any[wrap_register(i) for i in inputs], Observable[], onlynew)
     else
+        # the parameter type is manually given
         obs = Observable{type}(value, f,
             Any[wrap_register(i) for i in inputs], Observable[], onlynew)
     end
-    # register this observable
+
+    # register the new observable with the inputs
     for o in inputs
         if o isa Observable
             register!(o, obs)
         end
     end
+
     obs
 end
 
