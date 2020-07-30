@@ -1,20 +1,75 @@
 module Observables2
 
+
 export Observable
-export observe
+export observe!
 export stop_observing!
 export disable!
+export listeners
+export notify!
+export to_value
+export on
+export off
+export onany
+export connect! # obsid, async_latest, throttle
+export NoValue
+export n_ordinary_inputs
+export n_observable_inputs
 
-mutable struct Observable{V, F<:Union{Function, Nothing}}
+abstract type AbstractObservable{T} end
+
+struct NoValue end
+
+
+mutable struct Observable{V} <: AbstractObservable{V}
     val::V
-    f::F
+    f::Any
     inputs::Vector{Any}
-    observers::Vector{Observable}
+    listeners::Vector{<:Observable}
     onlynew::Bool
+end
 
-    Observable(value::V, f::F, inputs, observers, onlynew) where {V, F} = new{V,F}(value, f, inputs, observers, onlynew)
 
-    Observable{V}(value, f::F, inputs, observers, onlynew) where {V, F} = new{V,F}(value, f, inputs, observers, onlynew)
+# creating an observable from a value only
+# no inputs or listeners are set up
+Observable(v; onlynew = false, type = nothing) =
+    Observable{isnothing(type) ? typeof(v) : type}(v, nothing, [], Observable[], onlynew)
+
+Observable{T}(v) where T = Observable(v; type = T)
+
+# function Base.map(f, o::AbstractObservable, os...)
+#     observe!(f, o, os...)
+# end
+
+Base.eltype(::AbstractObservable{T}) where {T} = T
+
+
+
+
+
+# triggering an observable again with its current value
+function notify!(o::Observable)
+    o[!] = o[]
+end
+
+
+# extracting a value from an observable
+to_value(o::Observable) = o.val
+to_value(x) = x
+
+listeners(o::Observable) = o.listeners
+
+
+function Base.copy(o::Observable{T}) where T
+    oc = Observable{T}(o.val)
+    on(o) do o
+        oc[] = o
+    end
+    oc
+end
+
+function connect!(o1::Observable, o2::Observable)
+    error("not implemented")
 end
 
 # if we allow replacement of active observables with their values to inactivate them
@@ -24,17 +79,20 @@ struct RegisteredObservable
     o::Observable
 end
 
-Observable(v; onlynew = false, type = nothing) =
-    Observable{isnothing(type) ? typeof(v) : type}(v, nothing, [], Observable[], onlynew)
 
 get_registered_value(r::RegisteredObservable) = r.o.val
 get_registered_value(any) = any
 
 function Base.setindex!(obs::Observable, value, ::typeof(!))
     obs.val = value
-    for o in obs.observers
-        new_value = o.f((get_registered_value(input) for input in o.inputs)...)
-        set_new_value!(o, new_value)
+    for o in obs.listeners
+        # NoValue observables don't get a new value set, just their function called
+        if o isa Observable{NoValue}
+            o.f((get_registered_value(input) for input in o.inputs)...)
+        else
+            new_value = o.f((get_registered_value(input) for input in o.inputs)...)
+            set_new_value!(o, new_value)
+        end
     end
     obs
 end
@@ -52,14 +110,12 @@ end
 Base.getindex(obs::Observable) = obs.val
 
 function register!(with::Observable, o::Observable)
-    if o in with.observers
+    if o in with.listeners
         error("Observable already registered as observer.")
     end
-    push!(with.observers, o)
+    push!(with.listeners, o)
 end
 
-get_value(any) = any
-get_value(o::Observable) = o.val
 
 wrap_register(any) = any
 wrap_register(o::Observable) = RegisteredObservable(o)
@@ -67,57 +123,98 @@ wrap_register(o::Observable) = RegisteredObservable(o)
 unwrap_register(any) = any
 unwrap_register(ro::RegisteredObservable) = ro.o
 
-function observe(f::Function, inputs...; onlynew = false, type::Union{Type, Nothing} = nothing)
-    # compute first value
-    value = f((get_value(input) for input in inputs)...)
-    # make a new observer that tracks who he observes but isn't yet registered with the other observers
+
+
+# creating an observable from inputs and a function acting on those inputs
+
+function observe!(f, inputs...; onlynew = false, type::Union{Type, Nothing, NoValue} = nothing)
+
+    # compute first value if observable doesn't have the NoValue type
+    # the NoValue type is for on/onany which don't store values, just execute functions
+    value = if type isa NoValue
+        NoValue()
+    else
+        f((to_value(input) for input in inputs)...)
+    end
+
+    # make a new observer that tracks who he observes but isn't yet registered with the other listeners
     if isnothing(type)
-        observable = Observable(value, f,
+        obs = Observable(value, f,
+            Any[wrap_register(i) for i in inputs], Observable[], onlynew)
+    elseif type isa NoValue
+        obs = Observable{NoValue}(NoValue(), f,
             Any[wrap_register(i) for i in inputs], Observable[], onlynew)
     else
-        observable = Observable{type}(value, f,
+        obs = Observable{type}(value, f,
             Any[wrap_register(i) for i in inputs], Observable[], onlynew)
     end
     # register this observable
     for o in inputs
         if o isa Observable
-            register!(o, observable)
+            register!(o, obs)
         end
     end
-    observable
+    obs
 end
+
+# these functions mimick the current observables api
+# the difference is that they return an observable{NoValue} and not a function
+# that is because a function doesn't know about observables that keep track of it
+# so it becomes more difficult to unlink
+
+function on(f, input)
+    observe!(f, input, type = NoValue())
+end
+
+# here the order is different, the listener is removed from the input
+# because only that direction is possible in Observables.jl
+function off(input, listener)
+    stop_observing!(listener, input)
+end
+
+function onany(f, inputs...)
+    observe!(f, inputs...; type = NoValue())
+end
+
+
+
+
 
 """
     stop_observing!(observer::Observable, input::Observable)
 
 Replace the `input` `Observable` in the input vector of the `observer` with its value
-and remove the `observer` from the `observers` of the `input` `Observable`.
+and remove the `observer` from the `listeners` of the `input` `Observable`.
 """
 function stop_observing!(observer::Observable, input::Observable)
     # delete input in observer
     inputindex = findfirst(==(RegisteredObservable(input)), observer.inputs)
+
     if isnothing(inputindex)
-        error("Observable was not registered as an input.")
+        error("The input observable was not found as an input in the listener observable.")
     end
 
-    observerindex = findfirst(==(observer), input.observers)
+    observerindex = findfirst(==(observer), input.listeners)
     if isnothing(observerindex)
-        error("Observable was not registered as an observer.")
+        error("The listener observable was not found as a listener in the input observable.")
     end
 
-    observer.inputs[inputindex] = get_value(input)
-    deleteat!(input.observers, observerindex)
+    observer.inputs[inputindex] = to_value(input)
+    deleteat!(input.listeners, observerindex)
 end
 
+
+# if the input is not an observable
 function stop_observing!(observer::Observable, input)
     # do nothing
 end
+
 
 """
     stop_observing!(observer::Observable)
     
 Replace all `Observable`s in the input vector of the `observer` with their values
-and remove the `observer` from the `observers` of each of these `Observable`s.
+and remove the `observer` from the `listeners` of each of these `Observable`s.
 """
 function stop_observing!(observer::Observable)
     for input in observer.inputs
@@ -125,33 +222,19 @@ function stop_observing!(observer::Observable)
     end
 end
 
-n_ordinary_inputs(o::Observable) = sum((!isa).(o.inputs, RegisteredObservable))
-n_observable_inputs(o::Observable) = sum(isa.(o.inputs, RegisteredObservable))
-
-function Base.show(io::IO, o::Observable{V}) where V
-
-    n_observable = n_observable_inputs(o)
-    n_ordinary = n_ordinary_inputs(o)
-    n_observers = length(o.observers)
-
-    str = "Observable{$V} with $n_observable observable, $n_ordinary ordinary inputs, and $n_observers observers."
-    println(io, str)
-    print(io, "Value: $(o.val)")
-    nothing
-end
 
 """
     disable!(o::Observable; recursive = true)
 
-Make all observers of `o` stop observing it.
-If `recursive` is `true`, all observers that don't have any `Observable` inputs
+Make all listeners of `o` stop observing it.
+If `recursive` is `true`, all listeners that don't have any `Observable` inputs
 left after stopping are also disabled.
 
 Returns the number of all disabled `Observable`s.
 """
 function disable!(o::Observable; recursive = true)
     n_disabled = 1
-    for observer in o.observers
+    for observer in o.listeners
         stop_observing!(observer, o)
         # if the observer doesn't have any inputs left that are observables
         # we can disable it as well, because it will never be triggered again
@@ -161,5 +244,26 @@ function disable!(o::Observable; recursive = true)
     end
     n_disabled
 end
+
+
+
+n_ordinary_inputs(o::Observable) = sum((!isa).(o.inputs, RegisteredObservable))
+n_observable_inputs(o::Observable) = sum(isa.(o.inputs, RegisteredObservable))
+
+
+
+function Base.show(io::IO, o::Observable{V}) where V
+
+    n_observable = n_observable_inputs(o)
+    n_ordinary = n_ordinary_inputs(o)
+    n_listeners = length(o.listeners)
+
+    str = "Observable{$V} with $n_observable observable, $n_ordinary ordinary inputs, and $n_listeners listeners."
+    println(io, str)
+    print(io, "Value: $(o.val)")
+    nothing
+end
+
+
 
 end # module
