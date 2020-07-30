@@ -90,6 +90,7 @@ end
 get_registered_value(r::RegisteredObservable) = r.o.val
 get_registered_value(any) = any
 
+# obs[!] = new_value always triggers a change message
 function Base.setindex!(obs::Observable, value, ::typeof(!))
     obs.val = value
     for o in obs.listeners
@@ -108,9 +109,9 @@ function Base.setindex!(obs::Observable, value, ::typeof(!))
     obs
 end
 
-
+# obs[] = new_value only triggers a change message if onlynew is true
 function Base.setindex!(obs::Observable, value)
-    if !obs.onlynew || obs.val != value
+    if !(obs.onlynew && obs.val == value)
         obs[!] = value
     end
 end
